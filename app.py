@@ -10,6 +10,7 @@ class ConventionMembers(object):
 class HandleRegistrationChanges(object):
     def __init__(self, val):
         self.value = val
+        self.nodes = dict()
 
 
 class MasterController(ActorTypeDispatcher):
