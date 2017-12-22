@@ -34,3 +34,7 @@ class MasterController(ActorTypeDispatcher):
         # self.send(sender, self.convention_members)
         self.send(sender, 'Hi there')
 
+
+class NodeController(ActorTypeDispatcher):
+    def receiveMessage_str(self, message, sender):
+        self.send(sender, message)

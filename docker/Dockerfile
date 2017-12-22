@@ -2,7 +2,7 @@
 FROM ubuntu:latest
 
 # Install basic dependencies
-RUN apt update && apt install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     git
@@ -11,6 +11,9 @@ RUN apt update && apt install -y --no-install-recommends \
 RUN cd /usr/bin \
     && ln -s python3 python \
     && ln -s pip3 pip
+
+# Need to install setuptools to build from source distributions
+RUN pip install setuptools
 
 # Set up directory and download software from git
 RUN cd /opt \
@@ -22,6 +25,9 @@ RUN cd /opt/multi-machine-ripper \
 
 EXPOSE 1900
 EXPOSE 22
+
+CMD ["python", "/opt/multi-machine-ripper/start.py", "1900"]
+
 
 
 
