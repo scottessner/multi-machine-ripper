@@ -1,40 +1,58 @@
-from thespian.actors import ActorSystem
-import app
-import sys
+import os
 import platform
 import socket
+import subprocess
 import time
 
-port_number = int(sys.argv[1])
+from thespian.actors import ActorSystem
+
+from mmr import node_actors
+
+
+# from mmr.actors.actors import *
+
+def handbrake_exists():
+    try:
+        subprocess.call(["HandBrakeCLI", "--version"])
+    except OSError as e:
+        print('Handbrake error: {0}'.format(e.errno))
+        return False
+    return True
+
+port_number = 1900
 hostname = platform.node()
 host_address = socket.gethostbyname(hostname)
-convention_leader = sys.argv[2]
+convention_leader = os.environ['MMR-LEADER']
 
-capability_names = (sys.argv + [''])[3].split(',')
 capabilities = dict([('Admin Port', port_number),
                      ('Convention Address.IPv4', (convention_leader, 1900)),
                      ('HostName', hostname),
-                    ] +
-                    list(zip(capability_names, [True] * len(capability_names))))
+                    ])
 
+if handbrake_exists():
+    capabilities['HandBrakeCLI'] = True
 
 asys = ActorSystem('multiprocTCPBase', capabilities)
 
+print(asys.capabilities)
+
 if host_address == convention_leader:
     print("I'm the convention leader, let's create a Master Controller")
-    controller = asys.createActor('app.MasterController',
-                                  globalName='MasterController')
+    controller = asys.createActor('mmr.coordinator.Coordinator',
+                                  globalName='Coordinator')
 
     print("Telling the master to watch for convention registration changes")
-    asys.tell(controller, app.HandleRegistrationChanges(True))
+    asys.tell(controller, node_actors.HandleRegistrationChanges(True))
 
     print("Now tell the master controller to create a node controller on my system")
-    controller.createActor(actorClass='app.NodeController',
-                           targetActorRequirements={
-                               'HostName': hostname},
-                           globalName='NodeController'
-                           )
+    node_controller = asys.ask(controller, node_actors.CreateNodeController(hostname))
+    print(node_controller)
+
+# while controller:
+#     print(controller)
+#     controller = asys.listen(timedelta(seconds=1.0))
+# sys.exit(0)
 
 while True:
-    print("sleeping")
-    time.sleep(100)
+    print('sleeping')
+    time.sleep(60)
