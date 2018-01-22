@@ -1,9 +1,0 @@
-[Unit]
-Description=Automatic Ripping Machine
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/python /app/mmr/test.py %i
-
-[Install]
-WantedBy=multi-user.target

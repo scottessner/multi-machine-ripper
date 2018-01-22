@@ -20,6 +20,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     handbrake-cli \
     libavcodec-extra
 
+RUN mkdir -p /data/incoming
+RUN mkdir -p /data/outgoing
+RUN mkdir -p /log
+
 # Set up directory and download software
 WORKDIR /app
 
