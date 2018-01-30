@@ -1,10 +1,12 @@
 from collections import deque
 import os
+import shutil
 from os import path
 import uuid
 import logging
 import time
 import enum
+
 
 class TranscodeJob(object):
     def __init__(self,
@@ -26,7 +28,7 @@ class TranscodeJob(object):
         self.base_path = base_path
         self.origin_host = origin_host
         self.dest_host = dest_host
-        self.relative_folder = self.folder.strip(self.base_path)
+        self.relative_folder = self.get_relative_folder(folder)
         self.relative_file = path.join(self.relative_folder, file_name)
         self.input_file = path.join(folder, file_name)
         self.output_file = str.replace(self.input_file, 'incoming', 'outgoing')
@@ -46,7 +48,7 @@ class TranscodeJob(object):
         self.progress = 0
 
     def update(self, state, progress, report=None):
-        print('Job Update! State: {0}, Progress: {1}, Report: {0}'.format(state, progress, report))
+        print('Job Update! State: {0}, Progress: {1}, Report: {2}'.format(state, progress, report))
         if state != self.state:
             if state == JobState.RIPPED:
                 self.rip_completed = time.time()
@@ -74,6 +76,14 @@ class TranscodeJob(object):
             elif state == JobState.COMPLETED:
                 self.final_file_size = path.getsize(self.output_file)
         self.progress = progress
+
+    def get_relative_folder(self, abs_folder):
+        base_folder, rel_folder = path.split(abs_folder)
+        while base_folder != self.base_path:
+            base_folder, rel_part = path.split(base_folder)
+            rel_folder = path.join(rel_part, rel_folder)
+        return rel_folder
+
 
     def __repr__(self):
         output = list()
@@ -103,13 +113,17 @@ class TranscodeQueue(object):
         logging.info('Queue created.')
 
     def add_job(self, job):
+        print('Adding job: {0}, {1}'.format(job.folder, job.file_name))
         self.jobs.append(job)
 
-    def make_job_ready(self, folder, file_name):
-        print('Status: {0}, Folder: {1}, File: {2}'.format(self.status(), folder[0], file_name))
-        # Return the first job that matches the folder and file name (there should only be one)
-        job = [job for job in self.jobs if job.folder == folder[0] and job.file_name == file_name][0]
-        self.update_job(job.id, JobState.RIPPED, 100)
+    def make_job_ready(self, updated_job):
+        for job in self.jobs:
+            print('Job info Folder: {0}, File: {1}'.format(job.folder, job.file_name))
+        jobs = [job for job in self.jobs if job.folder == updated_job.folder and job.file_name == updated_job.file_name]
+        if len(jobs) == 0:
+            self.add_job(updated_job)
+            jobs.append(updated_job)
+        self.update_job(jobs[0].id, JobState.RIPPED, 100)
         print(self.status())
 
     def start_job(self, host):
@@ -126,13 +140,16 @@ class TranscodeQueue(object):
             return None
 
     def update_job(self, job_id, state, progress, report=None):
+        logging.debug('Updating job with id %s to state %s', job_id, state)
         job = [job for job in self.jobs if job.id == job_id][0]
-        print('Job: {0}, State: {1}, Progress: {2}, Report: {3}'.format(job, state, progress, report))
+        # print('Job: {0}, State: {1}, Progress: {2}, Report: {3}'.format(job, state, progress, report))
         job.update(state, progress, report)
 
     def complete_job(self, job_id):
         completed_job = [job for job in self.jobs if job.id == job_id][0]
         completed_job.update(JobState.COMPLETED, 100)
+        if path.exists(completed_job.input_file):
+            os.remove(completed_job.input_file)
         self.jobs.remove(completed_job)
         jobs_in_project = [job for job in self.jobs if job.relative_folder == completed_job.relative_folder]
         if len(jobs_in_project) == 0:

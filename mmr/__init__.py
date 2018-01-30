@@ -1,4 +1,4 @@
-from .actors import Coordinator, NodeAcceptor, NodeController, Transcoder, messages, FolderWatcher, FileReceiver, FileSender
+from .actors import Coordinator, TranscodeManager, Transcoder, messages, FolderWatcher, FileReceiver, FileSender, JobQueue
 from .config import Config
 from .models import TranscodeJob, TranscodeQueue, JobState
 

@@ -1,3 +1,10 @@
+
+
+class InitJobQueue(object):
+    def __init__(self):
+        pass
+
+
 class AddTranscodeJob(object):
     def __init__(self, job):
         self.job = job
@@ -9,17 +16,8 @@ class AddTranscodeProject(object):
 
 
 class StartTranscodeJob(object):
-    def __init__(self, folder, file_name):
-        self.folder = folder,
-        self.file_name = file_name
-
-
-class UpdateTranscodeJob(object):
-    def __init__(self, job_id, state, progress, report=None):
-        self.job_id = job_id,
-        self.state = state,
-        self.progress = progress
-        self.report = report
+    def __init__(self, job):
+        self.job = job
 
 
 class NodeControllers(object):
@@ -39,30 +37,39 @@ class CreateNodeController(object):
 
 
 class InitWatcher(object):
-    def __init__(self, path, dest_host):
+    def __init__(self, path, dest_host, job_queue):
         self.path = path
         self.dest_host = dest_host
+        self.job_queue = job_queue
 
 
 class InitFileSender(object):
-    def __init__(self, file):
+    def __init__(self, job_id, job_state, file, job_queue):
+        self.job_id = job_id
+        self.job_state = job_state
         self.file = file
+        self.job_queue = job_queue
 
 
 class InitFileReceiver(object):
-    def __init__(self, file, source_address):
+    def __init__(self, job_id, job_state, file, source_address, job_queue):
+        self.job_id = job_id
+        self.job_state = job_state
         self.file = file
         self.source_address = source_address
+        self.job_queue = job_queue
 
 
-class SendNextChunk(object):
-    def __init__(self):
-        pass
+class SendChunk(object):
+    def __init__(self, offset):
+        self.offset = offset
 
 
 class Chunk(object):
-    def __init__(self, data, eof):
+    def __init__(self, data, length, offset, eof):
         self.data = data
+        self.length = length
+        self.offset = offset
         self.eof = eof
 
 
@@ -139,6 +146,11 @@ class CreateFolderWatcher(object):
         self.folder = folder
 
 
+class InitTranscodeManager(object):
+    def __init__(self, job_queue):
+        self.job_queue = job_queue
+
+
 class TranscodeJobRequest(object):
     def __init__(self, host):
         self.host = host
@@ -149,7 +161,27 @@ class TranscodeJobResponse(object):
         self.job = job
 
 
+class UpdateTranscodeJob(object):
+    def __init__(self, job_id, state, progress, report=None):
+        self.job_id = job_id
+        self.state = state
+        self.progress = progress
+        self.report = report
+
+
+class InitTranscoder(object):
+    def __init__(self, job, job_queue):
+        self.job = job
+        self.job_queue = job_queue
+
+
+class FileTranscodeComplete(object):
+    def __init__(self, return_code):
+        self.return_code = return_code
+
+
 class TranscodeJobComplete(object):
     def __init__(self, job, failed):
         self.job = job
         self.failed = failed
+
