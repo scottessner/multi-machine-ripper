@@ -47,7 +47,7 @@ class FileSender(ActorTypeDispatcher):
 
     def receiveMsg_ActorExitRequest(self, message, sender):
         self.fp.close()
-        os.remove(self.path)
+        # os.remove(self.path)
         self.enabled = False
 
 
@@ -62,6 +62,7 @@ class FileReceiver(ActorTypeDispatcher):
         self.host = platform.node()
         self.fp = None
         self.length = None
+        self.progress = None
 
     @staticmethod
     def actorSystemCapabilityCheck(capabilities, requirements):
@@ -92,7 +93,9 @@ class FileReceiver(ActorTypeDispatcher):
             self.fp.write(message.data)
             if not message.eof:
                 progress = self.fp.tell()*100//self.length
-                self.send(self.job_queue, m.UpdateTranscodeJob(self.job_id, self.job_state, progress))
+                if progress != self.progress:
+                    self.send(self.job_queue, m.UpdateTranscodeJob(self.job_id, self.job_state, progress))
+                    self.progress = progress
                 self.send(self.file_sender, m.SendChunk(self.fp.tell()))
             else:
                 logging.debug('Entire file received.')
