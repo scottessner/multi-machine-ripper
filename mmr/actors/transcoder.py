@@ -63,7 +63,9 @@ class Transcoder(ActorTypeDispatcher):
         progress = self._find_transcode_progress(line)
         if progress != self.progress:
             self.progress = progress
-            self.send(self.job_queue, m.UpdateTranscodeJob(self.job.id, JobState.TRANSCODING, progress=progress))
+            self.send(self.job_queue, m.UpdateTranscodeJob(job_id=self.job.id,
+                                                           state=JobState.TRANSCODING,
+                                                           progress=progress))
 
         if self.process.poll() is not None:
             logging.debug('Transcoder completed with return code %s', self.process.poll())

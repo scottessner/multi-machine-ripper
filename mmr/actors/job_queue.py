@@ -30,13 +30,10 @@ class JobQueue(ActorTypeDispatcher):
             pickle.dump(self.transcode_queue, f)
 
     def write_queue_file(self):
-        logging.debug('Attempting to save queue status to file')
         with open('/log/queue.txt', 'w+') as fp:
             fp.write(self.transcode_queue.status())
-        logging.debug('Save complete')
 
     def receiveMsg_WakeupMessage(self, message, sender):
-        logging.debug('Writing Queue File.')
         self.write_queue_file()
         if not self.exiting:
             self.wakeupAfter(timedelta(seconds=3))
@@ -55,10 +52,14 @@ class JobQueue(ActorTypeDispatcher):
         print(self.transcode_queue)
 
     def receiveMsg_UpdateTranscodeJob(self, message, sender):
-        # if isinstance(message.job_id, tuple):
-        #     logging.debug('Update job: Converting folder from tuple to string.')
-        #     message.job_id = message.job_id[0]
-        self.transcode_queue.update_job(message.job_id, message.state, message.progress)
+        self.transcode_queue.update_job(job_id=message.job_id,
+                                        folder=message.folder,
+                                        file_name=message.file_name,
+                                        state=message.state,
+                                        progress=message.progress,
+                                        report=message.report,
+                                        size=message.size
+                                        )
 
     def receiveMsg_TranscodeJobRequest(self, message, sender):
         job = self.transcode_queue.start_job(message.host)

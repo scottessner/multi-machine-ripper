@@ -162,11 +162,14 @@ class TranscodeJobResponse(object):
 
 
 class UpdateTranscodeJob(object):
-    def __init__(self, job_id, state, progress, report=None):
+    def __init__(self, job_id=None, folder=None, file_name=None, state=None, progress=None, report=None, size=None):
         self.job_id = job_id
+        self.folder = folder
+        self.file_name = file_name
         self.state = state
         self.progress = progress
         self.report = report
+        self.size = size
 
 
 class InitTranscoder(object):

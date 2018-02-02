@@ -94,7 +94,9 @@ class FileReceiver(ActorTypeDispatcher):
             if not message.eof:
                 progress = self.fp.tell()*100//self.length
                 if progress != self.progress:
-                    self.send(self.job_queue, m.UpdateTranscodeJob(self.job_id, self.job_state, progress))
+                    self.send(self.job_queue, m.UpdateTranscodeJob(job_id=self.job_id,
+                                                                   state=self.job_state,
+                                                                   progress=progress))
                     self.progress = progress
                 self.send(self.file_sender, m.SendChunk(self.fp.tell()))
             else:

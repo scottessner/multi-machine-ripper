@@ -1,11 +1,10 @@
-from collections import deque
 import os
-import shutil
 from os import path
 import uuid
 import logging
 import time
 import enum
+from csv import DictReader, DictWriter
 
 
 class TranscodeJob(object):
@@ -43,15 +42,20 @@ class TranscodeJob(object):
         self.transcode_report = None
         self.from_transcoder_started = None
         self.from_transcoder_completed = None
-        self.initial_file_size = None
-        self.final_file_size = None
+        self.initial_file_size = 0
+        self.final_file_size = 0
         self.progress = 0
 
-    def update(self, state, progress, report=None):
+    def update(self, state, progress, report=None, size=None):
         print('Job Update! State: {0}, Progress: {1}, Report: {2}'.format(state, progress, report))
         if state != self.state:
+            if state == JobState.RIPPING:
+                if size is not None:
+                    self.initial_file_size = size
             if state == JobState.RIPPED:
                 self.rip_completed = time.time()
+                if size is not None:
+                    self.initial_file_size = size
                 self.state = JobState.RIPPED
             if state == JobState.SENDING:
                 self.to_transcoder_started = time.time()
@@ -64,7 +68,9 @@ class TranscodeJob(object):
                 self.state = JobState.TRANSCODING
             elif state == JobState.TRANSCODED:
                 self.transcode_completed = time.time()
-                if report:
+                if size is not None:
+                    self.final_file_size = size
+                if report is not None:
                     self.transcode_report = report
                 self.state = JobState.TRANSCODED
             elif state == JobState.RECEIVING:
@@ -75,7 +81,8 @@ class TranscodeJob(object):
                 self.state = JobState.RECEIVED
             elif state == JobState.COMPLETED:
                 self.final_file_size = path.getsize(self.output_file)
-        self.progress = progress
+        if progress is not None:
+            self.progress = progress
 
     def get_relative_folder(self, abs_folder):
         base_folder, rel_folder = path.split(abs_folder)
@@ -84,26 +91,26 @@ class TranscodeJob(object):
             rel_folder = path.join(rel_part, rel_folder)
         return rel_folder
 
-
     def __repr__(self):
         output = list()
+        output.append(self.state.name.ljust(12))
+        output.append(str(self.progress).rjust(3))
+        output.append(self.transcode_host.ljust(12))
+        output.append(str(round(self.initial_file_size/1024/1024, 1)).rjust(9))
         output.append(self.relative_file)
-        output.append(self.state.name)
-        output.append(self.transcode_host)
-        output.append(str(self.progress))
-        return ', '.join(output)
+        return ' | '.join(output)
 
 
-class JobState(enum.Enum):
-    RIPPING = 1,
-    RIPPED = 2,
-    SENDING = 3,
-    SENT = 4,
-    TRANSCODING = 5,
-    TRANSCODED = 6,
-    RECEIVING = 7,
-    RECEIVED = 8,
-    COMPLETED = 9,
+class JobState(enum.IntEnum):
+    RIPPING = 1
+    RIPPED = 2
+    SENDING = 3
+    SENT = 4
+    TRANSCODING = 5
+    TRANSCODED = 6
+    RECEIVING = 7
+    RECEIVED = 8
+    COMPLETED = 9
     FAILED = 10
 
 
@@ -139,15 +146,25 @@ class TranscodeQueue(object):
         except IndexError:
             return None
 
-    def update_job(self, job_id, state, progress, report=None):
+    def get_job(self, job_id=None, folder=None, file_name=None):
+        job = None
+        if job_id is not None:
+            job = [job for job in self.jobs if job.id == job_id][0]
+        elif folder is not None and file_name is not None:
+            job = [job for job in self.jobs if
+                   job.folder == folder and job.file_name == file_name][0]
+        return job
+
+    def update_job(self, job_id=None, folder=None, file_name=None, state=None, progress=None, report=None, size=None):
         logging.debug('Updating job with id %s to state %s', job_id, state)
-        job = [job for job in self.jobs if job.id == job_id][0]
+        job = self.get_job(job_id, folder, file_name)
         # print('Job: {0}, State: {1}, Progress: {2}, Report: {3}'.format(job, state, progress, report))
-        job.update(state, progress, report)
+        job.update(state, progress, report, size)
 
     def complete_job(self, job_id):
         completed_job = [job for job in self.jobs if job.id == job_id][0]
         completed_job.update(JobState.COMPLETED, 100)
+        self.update_history(completed_job)
         if path.exists(completed_job.input_file):
             os.remove(completed_job.input_file)
         self.jobs.remove(completed_job)
@@ -162,24 +179,42 @@ class TranscodeQueue(object):
         logging.info(self.status())
 
     def status(self):
-        return '\n'.join([repr(job) for job in self.jobs])
 
-    # def status(self):
-    #     status = list()
-    #     status.append('Transcode Queue Status:')
-    #     status.append('Waiting Jobs')
-    #     if len(self.waiting):
-    #         for job in self.waiting:
-    #             status.append('    {0}'.format(job))
-    #     else:
-    #         status.append('    < none >')
-    #     status.append('Jobs in Progress')
-    #     if len(self.in_progress):
-    #         for id in self.in_progress:
-    #             status.append('    {0}: {1}'.format(self.in_progress[id][0], self.in_progress[id][1]))
-    #     else:
-    #         status.append('    < none >')
-    #     return '\n'.join(status)
+        output = list()
+        header = list()
+        header.append('STATE'.ljust(12))
+        header.append('PRG'.rjust(3))
+        header.append('HOST'.ljust(12))
+        header.append('SIZE (MB)'.rjust(9))
+        header.append('FILE')
+        output.append(' | '.join(header))
+        output.append('-' * 80)
+
+        self.jobs.sort(key=lambda x: x.state)
+        for job in self.jobs:
+            output.append(repr(job))
+        return '\n'.join(output)
+
+    def update_history(self, job):
+        history = list()
+        keys = list(job.__dict__.keys())
+
+        try:
+            with open('/log/job_history.csv', 'r+') as in_file:
+                reader = DictReader(in_file)
+                keys.extend(reader.fieldnames)
+                for row in reader:
+                    history.append(row)
+        except FileNotFoundError:
+            logging.info('History file not found.  Creating now.')
+
+        final_keys = set(keys)
+
+        with open('/log/job_history.csv', 'w+') as out_file:
+            writer = DictWriter(out_file, fieldnames=final_keys)
+            writer.writeheader()
+            writer.writerows(history)
+            writer.writerow(job.__dict__)
 
     def __repr__(self):
         return self.status()

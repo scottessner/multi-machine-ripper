@@ -53,7 +53,7 @@ class TranscodeManager(ActorTypeDispatcher):
 
     def receiveMsg_FileTransferComplete(self, message, sender):
         if self.state == TCState.RETRIEVING:
-            self.send(self.queue, m.UpdateTranscodeJob(self.job.id, JobState.SENT, 100, None))
+            self.send(self.queue, m.UpdateTranscodeJob(job_id=self.job.id, state=JobState.SENT, progress=100))
             self._transcode_job()
         elif self.state == TCState.SENDING:
             print('Removing from {0}: {1}'.format(self.host, self.job.input_file))
@@ -62,7 +62,7 @@ class TranscodeManager(ActorTypeDispatcher):
             print('Removing from {0}: {1}'.format(self.host, self.job.output_file))
             for folder in os.listdir('/data/outgoing'):
                 shutil.rmtree(os.path.join('/data/outgoing/', folder))
-            self.send(self.queue, m.UpdateTranscodeJob(self.job.id, JobState.RECEIVED, 100, None))
+            self.send(self.queue, m.UpdateTranscodeJob(job_id=self.job.id, state=JobState.RECEIVED, progress=100))
             self._complete_job()
 
     def receiveMsg_FileTranscodeComplete(self, message, sender):
@@ -72,7 +72,11 @@ class TranscodeManager(ActorTypeDispatcher):
             pass
         else:
             logging.info('Transcode completed successfully.')
-            self.send(self.queue, m.UpdateTranscodeJob(self.job.id, JobState.TRANSCODED, 100, None))
+            size = os.path.getsize(self.job.output_file)
+            self.send(self.queue, m.UpdateTranscodeJob(job_id=self.job.id,
+                                                       state=JobState.TRANSCODED,
+                                                       progress=100,
+                                                       size=size))
             self._send_job()
 
     def receiveMsg_WakeupMessage(self, message, sender):
@@ -85,7 +89,7 @@ class TranscodeManager(ActorTypeDispatcher):
         self.state = TCState.RETRIEVING
         if self.job.origin_host != self.host:
             logging.debug('File not on current host. Initiating transfer.')
-            self.send(self.queue, m.UpdateTranscodeJob(self.job.id, JobState.SENDING, 0, None))
+            self.send(self.queue, m.UpdateTranscodeJob(job_id=self.job.id, state=JobState.SENDING, progress=0))
             self._transfer_file(JobState.SENDING, self.job.origin_host, self.job.input_file, self.host, self.job.input_file)
         else:
             logging.debug('File on current host.  Initiating transcode.')
@@ -95,7 +99,7 @@ class TranscodeManager(ActorTypeDispatcher):
         self.state = TCState.SENDING
         if self.host != self.job.dest_host:
             logging.debug('File not on current host. Initiating transfer.')
-            self.send(self.queue, m.UpdateTranscodeJob(self.job.id, JobState.RECEIVING, 0, None))
+            self.send(self.queue, m.UpdateTranscodeJob(job_id=self.job.id, state=JobState.RECEIVING, progress=0))
             self._transfer_file(JobState.RECEIVING, self.host, self.job.output_file, self.job.dest_host, self.job.output_file)
 
         else:
@@ -103,7 +107,7 @@ class TranscodeManager(ActorTypeDispatcher):
             self._complete_job()
 
     def _complete_job(self):
-        self.send(self.queue, m.UpdateTranscodeJob(self.job.id, JobState.RECEIVED, 100, None))
+        self.send(self.queue, m.UpdateTranscodeJob(job_id=self.job.id, state=JobState.RECEIVED, progress=100))
         logging.info('Job completed successfully.')
         self.send(self.queue, m.TranscodeJobComplete(self.job, failed=False))
         self.job = None

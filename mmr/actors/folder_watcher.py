@@ -1,11 +1,11 @@
 from thespian.actors import *
 from . import messages as m
-from ..models import TranscodeJob
+from ..models import TranscodeJob, JobState
 import platform
 import inotify.adapters
 import inotify.constants as ic
 import logging
-
+import os
 
 class FolderWatcher(ActorTypeDispatcher):
     def __init__(self):
@@ -60,6 +60,14 @@ class FolderWatcher(ActorTypeDispatcher):
                                                                                  base_path=self.watched_folder,
                                                                                  origin_host=self.host,
                                                                                  dest_host=self.dest_host)))
+
+                    if eventinfo.mask == ic.IN_ACCESS:
+                        size = os.path.getsize(os.path.join(folder, file))
+                        self.send(self.job_queue, m.UpdateTranscodeJob(folder=folder,
+                                                                       file_name=file,
+                                                                       state=JobState.RIPPING,
+                                                                       size=size))
+
                     # If the event is a file 'IN_CLOSE_WRITE' (mask=8), mark it as ready to transcode
                     elif eventinfo.mask == ic.IN_CLOSE_WRITE:
                         print('Time to Write')
@@ -69,7 +77,13 @@ class FolderWatcher(ActorTypeDispatcher):
                                                                                    file_name=file,
                                                                                    base_path=self.watched_folder,
                                                                                    origin_host=self.host,
-                                                                                   dest_host=self.dest_host)))
+                                                                                   dest_host=self.dest_host,
+                                                                                   )))
+                        size = os.path.getsize(os.path.join(folder, file))
+                        self.send(self.job_queue, m.UpdateTranscodeJob(folder=folder,
+                                                                       file_name=file,
+                                                                       state=JobState.RIPPED,
+                                                                       size=size))
             # Make sure to break out after each event
             break
 
