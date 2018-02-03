@@ -61,7 +61,7 @@ class FolderWatcher(ActorTypeDispatcher):
                                                                                  origin_host=self.host,
                                                                                  dest_host=self.dest_host)))
 
-                    if eventinfo.mask == ic.IN_ACCESS:
+                    if eventinfo.mask == ic.IN_MODIFY:
                         size = os.path.getsize(os.path.join(folder, file))
                         self.send(self.job_queue, m.UpdateTranscodeJob(folder=folder,
                                                                        file_name=file,
