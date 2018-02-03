@@ -63,6 +63,7 @@ class FolderWatcher(ActorTypeDispatcher):
 
                     if eventinfo.mask == ic.IN_MODIFY:
                         size = os.path.getsize(os.path.join(folder, file))
+                        logging.debug('Sending Update %s/%s is now %s bytes', folder, file, size)
                         self.send(self.job_queue, m.UpdateTranscodeJob(folder=folder,
                                                                        file_name=file,
                                                                        state=JobState.RIPPING,

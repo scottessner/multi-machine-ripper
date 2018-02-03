@@ -47,11 +47,8 @@ class TranscodeJob(object):
         self.progress = 0
 
     def update(self, state, progress, report=None, size=None):
-        print('Job Update! State: {0}, Progress: {1}, Report: {2}'.format(state, progress, report))
+        print('Job Update! State: {0}, Progress: {1}, Size: {2} Report: {3}'.format(state, progress, size, report))
         if state != self.state:
-            if state == JobState.RIPPING:
-                if size is not None:
-                    self.initial_file_size = size
             if state == JobState.RIPPED:
                 self.rip_completed = time.time()
                 if size is not None:
@@ -81,6 +78,11 @@ class TranscodeJob(object):
                 self.state = JobState.RECEIVED
             elif state == JobState.COMPLETED:
                 self.final_file_size = path.getsize(self.output_file)
+
+        if state == JobState.RIPPING:
+            if size is not None:
+                self.initial_file_size = size
+
         if progress is not None:
             self.progress = progress
 
@@ -156,7 +158,7 @@ class TranscodeQueue(object):
         return job
 
     def update_job(self, job_id=None, folder=None, file_name=None, state=None, progress=None, report=None, size=None):
-        logging.debug('Updating job with id %s to state %s', job_id, state)
+        logging.debug('Updating job with id %s to state %s with progress %s and size %s', job_id, state, progress, size)
         job = self.get_job(job_id, folder, file_name)
         # print('Job: {0}, State: {1}, Progress: {2}, Report: {3}'.format(job, state, progress, report))
         job.update(state, progress, report, size)
