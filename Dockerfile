@@ -54,7 +54,7 @@ RUN pip install -r requirements.txt
 EXPOSE 1900
 EXPOSE 22
 
-CMD ["python", "start.py", "1900"]
+CMD ["python", "run.py", "1900"]
 
 
 
