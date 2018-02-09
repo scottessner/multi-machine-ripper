@@ -3,6 +3,7 @@ from . import messages as m
 from datetime import timedelta
 from ..models import TranscodeJob, TranscodeQueue, JobState
 import os
+import shutil
 import pickle
 import logging
 
@@ -30,8 +31,9 @@ class JobQueue(ActorTypeDispatcher):
             pickle.dump(self.transcode_queue, f)
 
     def write_queue_file(self):
-        with open('/log/queue.txt', 'w+') as fp:
+        with open('/log/.queue.txt', 'w+') as fp:
             fp.write(self.transcode_queue.status())
+        shutil.move('/log/.queue.txt', '/log/queue.txt')
 
     def receiveMsg_WakeupMessage(self, message, sender):
         self.write_queue_file()
